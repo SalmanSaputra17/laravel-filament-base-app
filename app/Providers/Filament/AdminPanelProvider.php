@@ -29,7 +29,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            ->brandName(config('app.name', 'Admin Panel'))
+            ->brandName('Admin Panel')
             ->colors([
                 'primary' => Color::Emerald,
                 'gray' => Color::Slate,
