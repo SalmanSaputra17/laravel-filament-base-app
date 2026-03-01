@@ -18,7 +18,7 @@ class MakeModuleCommand extends Command
         $name = ucfirst($name);
         $tableName = Str::snake(Str::plural($name));
         $modelPath = app_path("Models/{$name}.php");
-        $migrationPath = database_path('migrations/' . date('Y_m_d_His') . "_create_{$tableName}_table.php");
+        $migrationPath = database_path('migrations/'.date('Y_m_d_His')."_create_{$tableName}_table.php");
         $policyPath = app_path("Policies/{$name}Policy.php");
         $resourcePath = app_path("Filament/Resources/{$name}Resource.php");
         $resourcePagesPath = app_path("Filament/Resources/{$name}Resource/Pages");
@@ -36,17 +36,14 @@ class MakeModuleCommand extends Command
         $this->createPolicy($name, $policyPath);
         $this->createFilamentResource($name, $resourcePath);
         $this->createFilamentResourcePages($name, $resourcePagesPath);
-        $this->registerResourceInPanel($name);
 
-        $this->info('Clearing Filament cache...');
+        $this->info('Clearing caches to discover new resources...');
         $this->call('filament:clear-cached-components');
+        $this->call('cache:clear');
 
         $this->info('Generating permissions with Shield...');
-        $this->call('shield:generate', [
-            '--all'            => true,
-            '--panel'          => 'admin',
-            '--no-interaction' => true,
-        ]);
+        exec('php artisan shield:generate --all --panel=admin --no-interaction 2>&1', $output, $exitCode);
+        $this->info(implode("\n", $output));
 
         $this->syncPermissionsToSuperAdmin();
 
@@ -349,26 +346,6 @@ PHP;
         File::put("{$path}/Edit{$name}.php", $editPage);
 
         $this->info("Created Filament Resource Pages in: {$path}");
-    }
-
-    protected function registerResourceInPanel(string $name): void
-    {
-        $providerPath = app_path('Providers/Filament/AdminPanelProvider.php');
-        $content = File::get($providerPath);
-
-        $useStatement = "use App\\Filament\\Resources\\{$name}Resource;";
-        if ( ! str_contains($content, $useStatement)) {
-            $content = preg_replace('/(use App\\\\Filament\\\\Resources\\\\UserResource;)/', "$1\n" . $useStatement,
-                $content);
-        }
-
-        $resourceRegistration = "{$name}Resource::class,";
-        if ( ! str_contains($content, $resourceRegistration)) {
-            $content = preg_replace('/(\->resources\(\[)/', "$1\n                {$resourceRegistration}", $content);
-        }
-
-        File::put($providerPath, $content);
-        $this->info("Registered {$name}Resource in AdminPanelProvider");
     }
 
     protected function syncPermissionsToSuperAdmin(): void
