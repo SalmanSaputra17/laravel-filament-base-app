@@ -18,7 +18,7 @@ class MakeModuleCommand extends Command
         $name = ucfirst($name);
         $tableName = Str::snake(Str::plural($name));
         $modelPath = app_path("Models/{$name}.php");
-        $migrationPath = database_path('migrations/'.date('Y_m_d_His')."_create_{$tableName}_table.php");
+        $migrationPath = database_path('migrations/' . date('Y_m_d_His') . "_create_{$tableName}_table.php");
         $policyPath = app_path("Policies/{$name}Policy.php");
         $resourcePath = app_path("Filament/Resources/{$name}Resource.php");
         $resourcePagesPath = app_path("Filament/Resources/{$name}Resource/Pages");
@@ -36,16 +36,19 @@ class MakeModuleCommand extends Command
         $this->createPolicy($name, $policyPath);
         $this->createFilamentResource($name, $resourcePath);
         $this->createFilamentResourcePages($name, $resourcePagesPath);
+        $this->registerResourceInPanel($name);
 
         $this->info('Clearing Filament cache...');
         $this->call('filament:clear-cached-components');
 
         $this->info('Generating permissions with Shield...');
         $this->call('shield:generate', [
-            '--all' => true,
-            '--panel' => 'admin',
+            '--all'            => true,
+            '--panel'          => 'admin',
             '--no-interaction' => true,
         ]);
+
+        $this->syncPermissionsToSuperAdmin();
 
         $this->info("Module {$name} created successfully!");
         $this->info('');
@@ -212,13 +215,19 @@ class {$name}Resource extends Resource
     {
         return \$form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->label('Name')
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\Textarea::make('description')
-                    ->label('Description')
-                    ->columnSpanFull(),
+                Forms\Components\Section::make('Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->label('Name')
+                            ->required()
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Description')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(4),
             ]);
     }
 
@@ -340,6 +349,37 @@ PHP;
         File::put("{$path}/Edit{$name}.php", $editPage);
 
         $this->info("Created Filament Resource Pages in: {$path}");
+    }
+
+    protected function registerResourceInPanel(string $name): void
+    {
+        $providerPath = app_path('Providers/Filament/AdminPanelProvider.php');
+        $content = File::get($providerPath);
+
+        $useStatement = "use App\\Filament\\Resources\\{$name}Resource;";
+        if ( ! str_contains($content, $useStatement)) {
+            $content = preg_replace('/(use App\\\\Filament\\\\Resources\\\\UserResource;)/', "$1\n" . $useStatement,
+                $content);
+        }
+
+        $resourceRegistration = "{$name}Resource::class,";
+        if ( ! str_contains($content, $resourceRegistration)) {
+            $content = preg_replace('/(\->resources\(\[)/', "$1\n                {$resourceRegistration}", $content);
+        }
+
+        File::put($providerPath, $content);
+        $this->info("Registered {$name}Resource in AdminPanelProvider");
+    }
+
+    protected function syncPermissionsToSuperAdmin(): void
+    {
+        $superAdminRole = \Spatie\Permission\Models\Role::where('name', 'super_admin')->first();
+
+        if ($superAdminRole) {
+            $allPermissions = \Spatie\Permission\Models\Permission::all();
+            $superAdminRole->givePermissionTo($allPermissions);
+            $this->info('Synced all permissions to super_admin role');
+        }
     }
 
     protected function camelCase(string $string): string
