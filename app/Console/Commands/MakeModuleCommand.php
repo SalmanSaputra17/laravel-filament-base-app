@@ -32,17 +32,26 @@ class MakeModuleCommand extends Command
         $this->info("Creating module: {$name}");
 
         $this->createMigration($name, $tableName, $migrationPath);
-        $this->createModel($name, $modelPath);
+        $this->createModel($name, $tableName, $modelPath);
         $this->createPolicy($name, $policyPath);
         $this->createFilamentResource($name, $resourcePath);
         $this->createFilamentResourcePages($name, $resourcePagesPath);
+
+        $this->info('Clearing Filament cache...');
+        $this->call('filament:clear-cached-components');
+
+        $this->info('Generating permissions with Shield...');
+        $this->call('shield:generate', [
+            '--all' => true,
+            '--panel' => 'admin',
+            '--no-interaction' => true,
+        ]);
 
         $this->info("Module {$name} created successfully!");
         $this->info('');
         $this->info('Next steps:');
         $this->info('1. Run migrations: php artisan migrate');
-        $this->info('2. Register the policy in app/Providers/AppServiceProvider.php');
-        $this->info('3. Run php artisan shield:generate to generate permissions');
+        $this->info('2. Assign permissions to a role in the admin panel');
 
         return self::SUCCESS;
     }
@@ -81,7 +90,7 @@ PHP;
         $this->info("Created migration: {$path}");
     }
 
-    protected function createModel(string $name, string $path): void
+    protected function createModel(string $name, string $tableName, string $path): void
     {
         $model = <<<PHP
 <?php
@@ -96,7 +105,7 @@ class {$name} extends Model
 {
     use HasAuthor, LogsActivity;
 
-    protected \$table = '{$this->argument('name')}';
+    protected \$table = '{$tableName}';
 
     protected \$guarded = [];
 
@@ -105,6 +114,13 @@ class {$name} extends Model
         return [
             //
         ];
+    }
+
+    public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
+    {
+        return \Spatie\Activitylog\LogOptions::defaults()
+            ->logAll()
+            ->logExcept(['updated_at']);
     }
 }
 PHP;
