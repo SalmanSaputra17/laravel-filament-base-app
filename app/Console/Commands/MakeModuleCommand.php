@@ -41,7 +41,7 @@ class MakeModuleCommand extends Command
         $this->info('');
         $this->info('Next steps:');
         $this->info('1. Run migrations: php artisan migrate');
-        $this->info('2. Register the policy in App/Providers/AuthServiceProvider.php');
+        $this->info('2. Register the policy in app/Providers/AppServiceProvider.php');
         $this->info('3. Run php artisan shield:generate to generate permissions');
 
         return self::SUCCESS;

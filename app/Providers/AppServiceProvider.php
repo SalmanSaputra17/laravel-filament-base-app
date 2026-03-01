@@ -19,5 +19,8 @@ class AppServiceProvider extends ServiceProvider
                 $column->dateTime('M Y, H:i');
             }
         });
+
+        // Register policies manually if needed:
+        // \Illuminate\Support\Facades\Gate::policy(\App\Models\Post::class, \App\Policies\PostPolicy::class);
     }
 }
